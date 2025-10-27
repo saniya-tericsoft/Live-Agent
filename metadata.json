@@ -1,0 +1,7 @@
+{
+  "name": "Alexa AI Assistant",
+  "description": "A conversational AI assistant, Alexa, ready to help with any topic or question. Engage in real-time voice conversations for assistance, information, or just friendly chat.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
