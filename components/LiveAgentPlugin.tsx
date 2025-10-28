@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLiveAgent } from '../hooks/useLiveAgent';
-import { AgentStatus } from '../types';
+import { AgentStatus, InterviewReport as InterviewReportType } from '../types';
 import { IconMic, IconStop, IconUser, IconAlex } from './IconComponents';
+import { InterviewReport } from './InterviewReport';
+import { generateInterviewEvaluation } from '../utils/interviewEvaluation';
 
 interface LiveAgentPluginProps {
   onStartLiveAgent: () => void;
@@ -26,6 +28,8 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const [interviewReport, setInterviewReport] = useState<InterviewReportType | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -154,9 +158,40 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
     startRecording();
   };
 
-  const handleEndSession = () => {
+  const handleEndSession = async () => {
+    console.log('Ending session...', { transcriptsCount: transcripts.length });
     endSession();
     stopRecording();
+    
+    // Always show report, even if transcripts are empty
+    setIsGeneratingReport(true);
+    
+    try {
+      console.log('Generating evaluation with transcripts:', transcripts);
+      const report = await generateInterviewEvaluation(
+        transcripts,
+        company || 'Company',
+        jobRole || 'Position'
+      );
+      console.log('Generated report:', report);
+      setInterviewReport(report);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      // Show fallback report
+      setInterviewReport({
+        overallScore: 5.0,
+        evaluationSummary: 'Interview completed. Unable to generate detailed evaluation. Please review the recording for assessment.',
+        candidateName: 'Candidate',
+        jobRole: jobRole || 'Position',
+        company: company || 'Company',
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleCloseReport = () => {
+    setInterviewReport(null);
   };
 
   const getStatusColor = () => {
@@ -194,6 +229,23 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
   };
 
   return (
+    <>
+      {/* Interview Report Modal */}
+      {interviewReport && (
+        <InterviewReport report={interviewReport} onClose={handleCloseReport} />
+      )}
+
+      {/* Generating Report Overlay */}
+      {isGeneratingReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 shadow-2xl text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Generating Interview Report</h3>
+            <p className="text-gray-600">Please wait while we analyze the interview...</p>
+          </div>
+        </div>
+      )}
+
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
@@ -228,70 +280,69 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex gap-6 max-w-7xl mx-auto w-full px-6 py-6">
-        {/* Video Feed Section */}
-        <div className="w-80 flex-shrink-0">
-          <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
-            <div className="relative">
+      <div className="flex-1 flex gap-4 w-full px-6 py-6">
+        {/* Video Feed Section - Takes Most Space */}
+        <div className="flex-1">
+          <div className="sticky top-6 bg-white rounded-2xl shadow-lg p-6 border border-gray-100 h-[calc(100vh-140px)]">
+            <div className="relative h-full">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-64 object-cover rounded-xl bg-gray-900"
+                className="w-full h-full object-cover rounded-xl bg-gray-900"
               />
               {isRecording && (
-                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-500 px-3 py-1.5 rounded-full">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                  <span className="text-xs font-semibold text-white">Recording</span>
+                <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-500 px-4 py-2 rounded-full">
+                  <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-white">Recording</span>
                 </div>
               )}
             </div>
-            <div className="mt-3 text-center text-xs text-gray-500">
+            <div className="mt-4 text-center text-sm text-gray-500">
               Note: Do not refresh the page or you'll lose the data.
             </div>
           </div>
         </div>
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        {/* Chat Area - Smaller Sidebar */}
+        <div className="w-80 flex-shrink-0 flex flex-col">
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
+          <div className="flex-1 overflow-y-auto bg-white rounded-2xl shadow-lg p-4 mb-4 border border-gray-100">
             {transcripts.length === 0 ? (
               <div className="h-full flex items-center justify-center text-center text-gray-500">
                 <div>
-                  <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <IconAlex className="w-12 h-12 text-blue-600" />
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <IconAlex className="w-8 h-8 text-blue-600" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome to Your Interview</h2>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                    Alex is ready to chat with you about the {jobRole || 'position'} role{company ? ` at ${company}` : ''}.
-                    Click "Start Interview" below to begin.
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Chat with Alex</h3>
+                  <p className="text-xs text-gray-600">
+                    Start the interview to begin chatting
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {transcripts.map((entry, index) => (
-                  <div key={index} className={`flex items-start gap-4 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div key={index} className={`flex items-start gap-2 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {entry.speaker === 'agent' && (
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                          <IconAlex className="w-6 h-6 text-blue-600" />
+                        <div className="w-7 h-7 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                          <IconAlex className="w-4 h-4 text-blue-600" />
                         </div>
                       </div>
                     )}
-                    <div className={`max-w-2xl p-4 rounded-2xl ${
+                    <div className={`max-w-[200px] p-2.5 rounded-xl ${
                       entry.speaker === 'user' 
                         ? 'bg-blue-500 text-white rounded-br-none' 
                         : 'bg-gray-100 text-gray-800 rounded-bl-none'
                     }`}>
-                      <p className="text-base leading-relaxed">{entry.text}</p>
+                      <p className="text-xs leading-relaxed">{entry.text}</p>
                     </div>
                     {entry.speaker === 'user' && (
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                          <IconUser className="w-6 h-6 text-gray-600" />
+                        <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center">
+                          <IconUser className="w-4 h-4 text-gray-600" />
                         </div>
                       </div>
                     )}
@@ -302,28 +353,28 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
           </div>
 
           {/* Control Panel */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+          <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
             {!isConnected ? (
               <button
                 onClick={handleStartSession}
                 disabled={agentStatus === AgentStatus.CONNECTING}
-                className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold text-sm hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                <IconMic className="w-6 h-6" />
+                <IconMic className="w-4 h-4" />
                 {agentStatus === AgentStatus.CONNECTING ? 'Connecting...' : 'Start Interview'}
               </button>
             ) : (
-              <div className="space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <p className="text-sm text-blue-800">
-                    <strong>Interview in progress.</strong> Speak naturally - Alex is listening and will respond.
+              <div className="space-y-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-center">
+                  <p className="text-xs text-blue-800">
+                    <strong>Interview in progress</strong>
                   </p>
                 </div>
                 <button
                   onClick={handleEndSession}
-                  className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold text-lg hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold text-sm hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                 >
-                  <IconStop className="w-6 h-6" />
+                  <IconStop className="w-4 h-4" />
                   End Interview
                 </button>
               </div>
@@ -332,5 +383,6 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };

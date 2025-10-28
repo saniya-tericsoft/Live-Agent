@@ -21,3 +21,11 @@ export interface AgentConfig {
   customQuestions: string;
   createdAt: Date;
 }
+
+export interface InterviewReport {
+  overallScore: number;
+  evaluationSummary: string;
+  candidateName?: string;
+  jobRole: string;
+  company: string;
+}
