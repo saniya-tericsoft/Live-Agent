@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLiveAgent } from '../hooks/useLiveAgent';
 import { AgentStatus } from '../types';
 import { IconMic, IconStop, IconUser, IconAlex } from './IconComponents';
@@ -23,15 +23,140 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
     transcripts,
   } = useLiveAgent({ company, jobRole, customQuestions });
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const isConnected = agentStatus !== AgentStatus.DISCONNECTED && agentStatus !== AgentStatus.ERROR;
+
+  // Start camera
+  useEffect(() => {
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: false // Audio is handled separately by useLiveAgent
+        });
+        setVideoStream(stream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // Update video element when stream changes
+  useEffect(() => {
+    if (videoRef.current && videoStream) {
+      videoRef.current.srcObject = videoStream;
+    }
+  }, [videoStream]);
+
+  // Timer effect
+  useEffect(() => {
+    if (isRecording) {
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const startRecording = async () => {
+    try {
+      // Combine video and audio streams for recording
+      const combinedStream = new MediaStream();
+      
+      // Add video tracks
+      if (videoStream) {
+        videoStream.getVideoTracks().forEach(track => {
+          combinedStream.addTrack(track);
+        });
+      }
+
+      // Add audio tracks from the microphone
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStream.getAudioTracks().forEach(track => {
+        combinedStream.addTrack(track);
+      });
+
+      const mediaRecorder = new MediaRecorder(combinedStream, {
+        mimeType: 'video/webm;codecs=vp9,opus'
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      recordedChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `interview-${company || 'recording'}-${new Date().toISOString()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setRecordingTime(0);
+    }
+  };
 
   const handleStartSession = () => {
     onStartLiveAgent();
     startSession();
+    startRecording();
   };
 
   const handleEndSession = () => {
     endSession();
+    stopRecording();
   };
 
   const getStatusColor = () => {
@@ -83,89 +208,127 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              {company && <p className="text-sm font-semibold text-gray-900">{company}</p>}
-              {jobRole && <p className="text-xs text-gray-600">{jobRole}</p>}
+            <div className="flex items-center gap-4">
+              {/* Timer */}
+              {isRecording && (
+                <div className="flex items-center gap-2 bg-purple-100 px-4 py-2 rounded-full">
+                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-purple-900">{formatTime(recordingTime)}</span>
+                </div>
+              )}
+              <div className="text-right">
+                {company && <p className="text-sm font-semibold text-gray-900">{company}</p>}
+                {jobRole && <p className="text-xs text-gray-600">{jobRole}</p>}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-6 py-6">
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
-          {transcripts.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-center text-gray-500">
-              <div>
-                <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <IconAlex className="w-12 h-12 text-blue-600" />
+      <div className="flex-1 flex gap-6 max-w-7xl mx-auto w-full px-6 py-6">
+        {/* Video Feed Section */}
+        <div className="w-80 flex-shrink-0">
+          <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-64 object-cover rounded-xl bg-gray-900"
+              />
+              {isRecording && (
+                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-500 px-3 py-1.5 rounded-full">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <span className="text-xs font-semibold text-white">Recording</span>
                 </div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome to Your Interview</h2>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                  Alex is ready to chat with you about the {jobRole || 'position'} role{company ? ` at ${company}` : ''}.
-                  Click "Start Interview" below to begin.
-                </p>
-              </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-6">
-              {transcripts.map((entry, index) => (
-                <div key={index} className={`flex items-start gap-4 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {entry.speaker === 'agent' && (
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                        <IconAlex className="w-6 h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  )}
-                  <div className={`max-w-2xl p-4 rounded-2xl ${
-                    entry.speaker === 'user' 
-                      ? 'bg-blue-500 text-white rounded-br-none' 
-                      : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                  }`}>
-                    <p className="text-base leading-relaxed">{entry.text}</p>
-                  </div>
-                  {entry.speaker === 'user' && (
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                        <IconUser className="w-6 h-6 text-gray-600" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="mt-3 text-center text-xs text-gray-500">
+              Note: Do not refresh the page or you'll lose the data.
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Control Panel */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-          {!isConnected ? (
-            <button
-              onClick={handleStartSession}
-              disabled={agentStatus === AgentStatus.CONNECTING}
-              className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-            >
-              <IconMic className="w-6 h-6" />
-              {agentStatus === AgentStatus.CONNECTING ? 'Connecting...' : 'Start Interview'}
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                <p className="text-sm text-blue-800">
-                  <strong>Interview in progress.</strong> Speak naturally - Alex is listening and will respond.
-                </p>
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
+            {transcripts.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-center text-gray-500">
+                <div>
+                  <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <IconAlex className="w-12 h-12 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome to Your Interview</h2>
+                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    Alex is ready to chat with you about the {jobRole || 'position'} role{company ? ` at ${company}` : ''}.
+                    Click "Start Interview" below to begin.
+                  </p>
+                </div>
               </div>
+            ) : (
+              <div className="space-y-6">
+                {transcripts.map((entry, index) => (
+                  <div key={index} className={`flex items-start gap-4 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {entry.speaker === 'agent' && (
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                          <IconAlex className="w-6 h-6 text-blue-600" />
+                        </div>
+                      </div>
+                    )}
+                    <div className={`max-w-2xl p-4 rounded-2xl ${
+                      entry.speaker === 'user' 
+                        ? 'bg-blue-500 text-white rounded-br-none' 
+                        : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                    }`}>
+                      <p className="text-base leading-relaxed">{entry.text}</p>
+                    </div>
+                    {entry.speaker === 'user' && (
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <IconUser className="w-6 h-6 text-gray-600" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Control Panel */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+            {!isConnected ? (
               <button
-                onClick={handleEndSession}
-                className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold text-lg hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                onClick={handleStartSession}
+                disabled={agentStatus === AgentStatus.CONNECTING}
+                className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
               >
-                <IconStop className="w-6 h-6" />
-                End Interview
+                <IconMic className="w-6 h-6" />
+                {agentStatus === AgentStatus.CONNECTING ? 'Connecting...' : 'Start Interview'}
               </button>
-            </div>
-          )}
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                  <p className="text-sm text-blue-800">
+                    <strong>Interview in progress.</strong> Speak naturally - Alex is listening and will respond.
+                  </p>
+                </div>
+                <button
+                  onClick={handleEndSession}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold text-lg hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                >
+                  <IconStop className="w-6 h-6" />
+                  End Interview
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
