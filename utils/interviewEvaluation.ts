@@ -21,7 +21,7 @@ export const generateInterviewEvaluation = async (
       };
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY as string });
 
     // Prepare the conversation for analysis
     const conversationText = transcripts
