@@ -13,9 +13,9 @@ export const IconUser: React.FC = () => (
   </div>
 );
 
-export const IconJanoo: React.FC = () => (
+export const IconAlex: React.FC = () => (
    <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-lg">
-    J
+    A
   </div>
 );
 

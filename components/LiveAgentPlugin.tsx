@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
 import { useLiveAgent } from '../hooks/useLiveAgent';
 import { AgentStatus } from '../types';
-import { IconMic, IconStop, IconUser, IconJanoo } from './IconComponents';
+import { IconMic, IconStop, IconUser, IconAlex } from './IconComponents';
 
 interface LiveAgentPluginProps {
   onStartLiveAgent: () => void;
+  company?: string;
+  jobRole?: string;
+  customQuestions?: string;
 }
 
-export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({ onStartLiveAgent }) => {
+export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({ 
+  onStartLiveAgent, 
+  company, 
+  jobRole, 
+  customQuestions 
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     startSession,
     endSession,
     agentStatus,
     transcripts,
-  } = useLiveAgent();
+  } = useLiveAgent({ company, jobRole, customQuestions });
 
   const isConnected = agentStatus !== AgentStatus.DISCONNECTED && agentStatus !== AgentStatus.ERROR;
 
@@ -105,7 +113,7 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({ onStartLiveAge
             <div className="flex items-center space-x-3">
               <div className={`w-3 h-3 rounded-full ${getStatusColor()}`}></div>
               <div>
-                <h3 className="font-semibold text-gray-900">Janoo</h3>
+                <h3 className="font-semibold text-gray-900">Alex</h3>
                 <p className="text-xs text-gray-600">{getStatusText()}</p>
               </div>
             </div>
@@ -124,14 +132,14 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({ onStartLiveAge
             {transcripts.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <IconJanoo className="w-6 h-6 text-blue-600" />
+                  <IconAlex className="w-6 h-6 text-blue-600" />
                 </div>
-                <p className="text-sm">Welcome! Click "Start" to begin chatting with Janoo.</p>
+                <p className="text-sm">Welcome! Click "Start" to begin chatting with Alex.</p>
               </div>
             ) : (
               transcripts.map((entry, index) => (
                 <div key={index} className={`flex items-start gap-2 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {entry.speaker === 'agent' && <IconJanoo className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />}
+                  {entry.speaker === 'agent' && <IconAlex className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />}
                   <div className={`max-w-xs p-3 rounded-2xl text-sm ${
                     entry.speaker === 'user' 
                       ? 'bg-blue-500 text-white rounded-br-none' 

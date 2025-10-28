@@ -23,14 +23,14 @@ const StatusContent: React.FC<{ status: AgentStatus }> = ({ status }) => {
        return (
         <>
           <IconThinking className="animate-spin" />
-          <span>Janoo is thinking...</span>
+          <span>Alex is thinking...</span>
         </>
       );
     case AgentStatus.SPEAKING:
       return (
         <>
           <IconSound className="text-blue-500" />
-          <span>Janoo is speaking...</span>
+          <span>Alex is speaking...</span>
         </>
       );
     case AgentStatus.ERROR:
