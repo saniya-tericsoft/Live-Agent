@@ -16,7 +16,6 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
   jobRole, 
   customQuestions 
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const {
     startSession,
     endSession,
@@ -26,22 +25,13 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
 
   const isConnected = agentStatus !== AgentStatus.DISCONNECTED && agentStatus !== AgentStatus.ERROR;
 
-  const handleToggle = () => {
-    if (!isExpanded) {
-      setIsExpanded(true);
-      onStartLiveAgent();
-    } else {
-      setIsExpanded(false);
-    }
-  };
-
   const handleStartSession = () => {
+    onStartLiveAgent();
     startSession();
   };
 
   const handleEndSession = () => {
     endSession();
-    setIsExpanded(false);
   };
 
   const getStatusColor = () => {
@@ -79,103 +69,105 @@ export const LiveAgentPlugin: React.FC<LiveAgentPluginProps> = ({
   };
 
   return (
-    <>
-      {/* Floating Plugin Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={handleToggle}
-          className="w-16 h-16 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center bg-white hover:bg-gray-50 border border-gray-200"
-        >
-          {isExpanded ? (
-            <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <div className="relative w-10 h-10">
-              {/* Blue hand icon - right hand with fingers slightly curled */}
-              <svg className="absolute inset-0 w-10 h-10" viewBox="0 0 24 24" fill="#3B82F6">
-                <path d="M18 8h-1V6c0-1.1-.9-2-2-2s-2 .9-2 2v2h-1V4c0-1.1-.9-2-2-2s-2 .9-2 2v4H7V6c0-1.1-.9-2-2-2S3 4.9 3 6v10c0 3.3 2.7 6 6 6h4c3.3 0 6-2.7 6-6v-6c0-1.1-.9-2-2-2zm0 8c0 2.2-1.8 4-4 4H9c-2.2 0-4-1.8-4-4V6c0-.6.4-1 1-1s1 .4 1 1v6h2V4c0-.6.4-1 1-1s1 .4 1 1v6h2V6c0-.6.4-1 1-1s1 .4 1 1v6h2c.6 0 1 .4 1 1v3z"/>
-              </svg>
-              {/* Red circle with white V - positioned at bottom-left of hand */}
-              <div className="absolute bottom-1 left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
-                <span className="text-white text-xs font-bold">V</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className={`w-4 h-4 rounded-full ${getStatusColor()} animate-pulse`}></div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Alex - AI Recruiter</h1>
+                  <p className="text-sm text-gray-600">{getStatusText()}</p>
+                </div>
               </div>
             </div>
-          )}
-        </button>
+            <div className="text-right">
+              {company && <p className="text-sm font-semibold text-gray-900">{company}</p>}
+              {jobRole && <p className="text-xs text-gray-600">{jobRole}</p>}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Expanded Chat Interface */}
-      {isExpanded && (
-        <div className="fixed bottom-24 right-6 w-80 h-96 bg-white rounded-xl shadow-2xl border z-50 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-xl">
-            <div className="flex items-center space-x-3">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor()}`}></div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-6 py-6">
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto bg-white rounded-2xl shadow-lg p-6 mb-6 border border-gray-100">
+          {transcripts.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-center text-gray-500">
               <div>
-                <h3 className="font-semibold text-gray-900">Alex</h3>
-                <p className="text-xs text-gray-600">{getStatusText()}</p>
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <IconAlex className="w-12 h-12 text-blue-600" />
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome to Your Interview</h2>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  Alex is ready to chat with you about the {jobRole || 'position'} role{company ? ` at ${company}` : ''}.
+                  Click "Start Interview" below to begin.
+                </p>
               </div>
             </div>
-            <button
-              onClick={() => setIsExpanded(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {transcripts.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <IconAlex className="w-6 h-6 text-blue-600" />
-                </div>
-                <p className="text-sm">Welcome! Click "Start" to begin chatting with Alex.</p>
-              </div>
-            ) : (
-              transcripts.map((entry, index) => (
-                <div key={index} className={`flex items-start gap-2 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {entry.speaker === 'agent' && <IconAlex className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />}
-                  <div className={`max-w-xs p-3 rounded-2xl text-sm ${
+          ) : (
+            <div className="space-y-6">
+              {transcripts.map((entry, index) => (
+                <div key={index} className={`flex items-start gap-4 ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {entry.speaker === 'agent' && (
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                        <IconAlex className="w-6 h-6 text-blue-600" />
+                      </div>
+                    </div>
+                  )}
+                  <div className={`max-w-2xl p-4 rounded-2xl ${
                     entry.speaker === 'user' 
                       ? 'bg-blue-500 text-white rounded-br-none' 
                       : 'bg-gray-100 text-gray-800 rounded-bl-none'
                   }`}>
-                    <p>{entry.text}</p>
+                    <p className="text-base leading-relaxed">{entry.text}</p>
                   </div>
-                  {entry.speaker === 'user' && <IconUser className="w-6 h-6 text-gray-600 flex-shrink-0 mt-1" />}
+                  {entry.speaker === 'user' && (
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                        <IconUser className="w-6 h-6 text-gray-600" />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-          {/* Control Panel */}
-          <div className="p-4 border-t bg-gray-50 rounded-b-xl">
-            {!isConnected ? (
-              <button
-                onClick={handleStartSession}
-                disabled={agentStatus === AgentStatus.CONNECTING}
-                className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                <IconMic className="w-4 h-4" />
-                {agentStatus === AgentStatus.CONNECTING ? 'Connecting...' : 'Start Chat'}
-              </button>
-            ) : (
+        {/* Control Panel */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+          {!isConnected ? (
+            <button
+              onClick={handleStartSession}
+              disabled={agentStatus === AgentStatus.CONNECTING}
+              className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+            >
+              <IconMic className="w-6 h-6" />
+              {agentStatus === AgentStatus.CONNECTING ? 'Connecting...' : 'Start Interview'}
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                <p className="text-sm text-blue-800">
+                  <strong>Interview in progress.</strong> Speak naturally - Alex is listening and will respond.
+                </p>
+              </div>
               <button
                 onClick={handleEndSession}
-                className="w-full py-2 px-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold text-lg hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
               >
-                <IconStop className="w-4 h-4" />
-                End Chat
+                <IconStop className="w-6 h-6" />
+                End Interview
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 };

@@ -36,9 +36,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: showDashboard ? undefined : 'transparent' }}>
-      {/* Dashboard Toggle Button */}
-      {!showDashboard && (
+    <div className="min-h-screen">
+      {/* Dashboard Toggle Button - Only show during interview */}
+      {!showDashboard && selectedAgent && (
         <button
           onClick={() => setShowDashboard(true)}
           className="fixed top-6 left-6 z-50 px-4 py-2 bg-white text-gray-700 rounded-lg shadow-lg hover:shadow-xl transition-all font-medium border border-gray-200 flex items-center gap-2"
